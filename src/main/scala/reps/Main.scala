@@ -1,4 +1,4 @@
 package reps
 
-object Main extends App:
+@main def main(): Unit =
   println("REPS fresh setup OK")
