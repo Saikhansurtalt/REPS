@@ -8,83 +8,70 @@ import reps.view.*
 import java.time.LocalDateTime
 
 @main def main(): Unit =
-
   println("=== REPS SYSTEM START ===")
 
   // --------------------------------------------------
-  // 1. Create sample energy data (offline demo data)
+  // Configuration
   // --------------------------------------------------
-  val sampleRecords = List(
-    EnergyRecord(
-      LocalDateTime.now.minusHours(3),
-      EnergySource.Solar,
-      40.0
-    ),
-    EnergyRecord(
-      LocalDateTime.now.minusHours(2),
-      EnergySource.Wind,
-      120.0
-    ),
-    EnergyRecord(
-      LocalDateTime.now.minusHours(1),
-      EnergySource.Hydro,
-      300.0
-    ),
-    EnergyRecord(
-      LocalDateTime.now,
-      EnergySource.Solar,
-      20.0
-    )
-  )
-
-  // --------------------------------------------------
-  // 2. Save records to CSV
-  // --------------------------------------------------
+  val useFingridApi = true   // set to false to force CSV fallback
   val csvPath = "energy-data.csv"
-  CsvIO.write(csvPath, sampleRecords)
-  println(s"Data written to $csvPath")
+
+  val fingridConfig =
+    FingridClient.DatasetConfig(
+      variableId = 245,          // ✅ your confirmed dataset
+      source = EnergySource.Wind // adjust if Fingrid labels it differently
+    )
 
   // --------------------------------------------------
-  // 3. Load records from CSV
+  // Load data (API → CSV fallback)
   // --------------------------------------------------
   val records =
-    CsvIO.read(csvPath) match
-      case Right(data) =>
-        println("Data successfully loaded from CSV")
-        data
-      case Left(error) =>
-        println(s"Error loading CSV: $error")
-        Nil
+    if useFingridApi then
+      FingridClient.fetch(
+        fingridConfig,
+        startTime = "2024-04-12T00:00:00Z",
+        endTime   = "2024-04-12T23:59:59Z"
+      ) match
+        case Right(data) =>
+          println("Data fetched from Fingrid API")
+          CsvIO.write(csvPath, data)
+          data
+        case Left(error) =>
+          println(s"Fingrid API error: $error")
+          println("Falling back to CSV")
+          CsvIO.read(csvPath).getOrElse(Nil)
+    else
+      CsvIO.read(csvPath).getOrElse(Nil)
 
   // --------------------------------------------------
-  // 4. Display loaded records
+  // Display records
   // --------------------------------------------------
   ConsoleView.showRecords(records)
 
   // --------------------------------------------------
-  // 5. Run statistics
+  // Statistics
   // --------------------------------------------------
-  val energyValues = records.map(_.energyMWh)
+  val values = records.map(_.energyMWh)
 
   println("\n--- Statistics ---")
-  println("Mean: " + Statistics.mean(energyValues))
-  println("Median: " + Statistics.median(energyValues))
-  println("Mode: " + Statistics.mode(energyValues))
-  println("Range: " + Statistics.range(energyValues))
-  println("Midrange: " + Statistics.midrange(energyValues))
+  println("Mean: " + Statistics.mean(values))
+  println("Median: " + Statistics.median(values))
+  println("Mode: " + Statistics.mode(values))
+  println("Range: " + Statistics.range(values))
+  println("Midrange: " + Statistics.midrange(values))
 
   // --------------------------------------------------
-  // 6. Run filtering example
+  // Filtering example (current hour)
   // --------------------------------------------------
   val currentHour = LocalDateTime.now.getHour
-  val recordsThisHour =
+  val filtered =
     Filters.byHour(currentHour)(records)
 
   println(s"\nRecords for hour $currentHour:")
-  ConsoleView.showRecords(recordsThisHour)
+  ConsoleView.showRecords(filtered)
 
   // --------------------------------------------------
-  // 7. Detect alerts
+  // Alerts
   // --------------------------------------------------
   val alerts =
     Alerts.detectLowOutput(50.0)(records) ++

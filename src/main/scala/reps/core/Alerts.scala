@@ -17,4 +17,4 @@ object Alerts:
     val present = records.map(_.source).toSet
     (expected -- present)
       .toList
-      .map(Alert.Malfunction)
+      .map(Alert.Malfunction.apply)
