@@ -8,7 +8,9 @@
  * Inthuja Inthumathan 002599632
  *
  * Description:
- * This file is part of the REPS project submission.
+ * This file handles communication with the Fingrid Open Data API.
+ * Network interaction and JSON parsing are isolated here to limit
+ * side effects and keep the functional core independent.
  */
 
 package reps.ingest
@@ -19,13 +21,43 @@ import scala.io.Source
 import scala.util.Try
 import java.time.LocalDateTime
 
+/**
+ * Provides functionality for retrieving renewable energy production
+ * data from the Fingrid Open Data API.
+ *
+ * This object performs controlled side effects related to network
+ * communication and returns results using Either for safe error handling.
+ */
 object FingridClient:
 
+  /**
+   * Configuration describing a Fingrid dataset.
+   *
+   * @param variableId
+   *   Identifier of the Fingrid dataset to query.
+   * @param source
+   *   The energy source associated with the dataset.
+   */
   final case class DatasetConfig(
                                   variableId: Int,
                                   source: EnergySource
                                 )
 
+  /**
+   * Fetches energy production data from the Fingrid API.
+   *
+   * An API key is read from the FINGRID_API_KEY environment variable.
+   * All error cases are modeled using Either instead of exceptions.
+   *
+   * @param config
+   *   Dataset configuration including variable identifier and energy source.
+   * @param startTime
+   *   Start time of the query in ISO format.
+   * @param endTime
+   *   End time of the query in ISO format.
+   * @return
+   *   Either an error message or a list of parsed energy records.
+   */
   def fetch(
              config: DatasetConfig,
              startTime: String,
@@ -61,6 +93,19 @@ object FingridClient:
         }.toEither.left.map(_.getMessage)
       }
 
+  /**
+   * Parses JSON response content returned by the Fingrid API.
+   *
+   * A simple pattern matching approach is used to extract timestamps
+   * and energy production values from the response.
+   *
+   * @param json
+   *   Raw JSON response string.
+   * @param source
+   *   Energy source associated with the dataset.
+   * @return
+   *   A list of parsed energy production records.
+   */
   private def parse(
                      json: String,
                      source: EnergySource

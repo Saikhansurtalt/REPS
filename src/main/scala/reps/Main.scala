@@ -8,7 +8,9 @@
  * Inthuja Inthumathan 002599632
  *
  * Description:
- * This file is part of the REPS project submission.
+ * This file contains the main entry point of the REPS application.
+ * It coordinates data ingestion, processing, and presentation by
+ * connecting the different system components.
  */
 
 package reps
@@ -20,24 +22,49 @@ import reps.view.*
 
 import java.time.LocalDateTime
 
+/**
+ * Entry point of the REPS application.
+ *
+ * This function acts as the orchestration layer that connects
+ * side effecting operations with the pure functional core.
+ * It contains no complex business logic itself.
+ */
 @main def main(): Unit =
   println("=== REPS SYSTEM START ===")
 
   // --------------------------------------------------
   // Configuration
   // --------------------------------------------------
-  val useFingridApi = true   // set to false to force CSV fallback
+
+  /**
+   * Flag controlling whether the Fingrid API is used.
+   * If set to false, the system will load data from CSV only.
+   */
+  val useFingridApi = true
+
+  /** File path used for CSV storage and fallback. */
   val csvPath = "energy-data.csv"
 
+  /**
+   * Configuration for the Fingrid dataset being queried.
+   * The variable identifier and energy source are defined here.
+   */
   val fingridConfig =
     FingridClient.DatasetConfig(
-      variableId = 245,          // ✅ your confirmed dataset
-      source = EnergySource.Wind // adjust if Fingrid labels it differently
+      variableId = 245,
+      source = EnergySource.Wind
     )
 
   // --------------------------------------------------
-  // Load data (API → CSV fallback)
+  // Load data (API first, CSV as fallback)
   // --------------------------------------------------
+
+  /**
+   * Loads energy production records.
+   *
+   * Data is fetched from the Fingrid API when enabled.
+   * If API access fails, the system falls back to local CSV data.
+   */
   val records =
     if useFingridApi then
       FingridClient.fetch(
@@ -57,13 +84,17 @@ import java.time.LocalDateTime
       CsvIO.read(csvPath).getOrElse(Nil)
 
   // --------------------------------------------------
-  // Display records
+  // Display loaded records
   // --------------------------------------------------
+
+  /** Displays all loaded energy records to the console. */
   ConsoleView.showRecords(records)
 
   // --------------------------------------------------
-  // Statistics
+  // Statistical analysis
   // --------------------------------------------------
+
+  /** Extract numeric energy values for statistical analysis. */
   val values = records.map(_.energyMWh)
 
   println("\n--- Statistics ---")
@@ -74,8 +105,12 @@ import java.time.LocalDateTime
   println("Midrange: " + Statistics.midrange(values))
 
   // --------------------------------------------------
-  // Filtering example (current hour)
+  // Filtering example
   // --------------------------------------------------
+
+  /**
+   * Demonstrates filtering by the current hour.
+   */
   val currentHour = LocalDateTime.now.getHour
   val filtered =
     Filters.byHour(currentHour)(records)
@@ -84,8 +119,12 @@ import java.time.LocalDateTime
   ConsoleView.showRecords(filtered)
 
   // --------------------------------------------------
-  // Alerts
+  // Alert detection
   // --------------------------------------------------
+
+  /**
+   * Generates alerts for low energy output and missing sources.
+   */
   val alerts =
     Alerts.detectLowOutput(50.0)(records) ++
       Alerts.detectMissingSources(
